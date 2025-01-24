@@ -58,7 +58,7 @@ class LangGraphAssistant:
         self.user_id = user_id
         #self.mongodb_saver = MongoDBSaver.from_conn_string(os.getenv("MONGODB_URI"))
         self.memory_saver = MemorySaver()
-        self.llm = AzureChatOpenAI(azure_deployment="HayatAI-GPT4o", api_version="2024-10-21", temperature=0)
+        self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
         self.tools = [add, multiply, divide]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read())
