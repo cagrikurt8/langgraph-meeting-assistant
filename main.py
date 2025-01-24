@@ -14,7 +14,6 @@ st.set_page_config(
 
 async def async_get_response(stream):
     async for event in stream:
-        #yield event
         if event["event"] == "on_chat_model_stream" and event['metadata'].get('langgraph_node', '') == "assistant":
             data = event["data"]
             yield data["chunk"].content
