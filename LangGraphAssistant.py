@@ -1,45 +1,12 @@
 from langgraph.checkpoint.mongodb import MongoDBSaver
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage, BaseMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import START, END, MessagesState, StateGraph
 from langgraph.prebuilt import tools_condition, ToolNode
 from langchain_core.runnables import RunnableConfig
-from dotenv import load_dotenv
 import os
-
-
-#########################################
-# TOOLS #
-#########################################
-def multiply(a: int, b: int) -> int:
-    """Multiply a and b.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return a * b
-
-
-def add(a: int, b: int) -> int:
-    """Adds a and b.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return a + b
-
-
-def divide(a: int, b: int) -> float:
-    """Adds a and b.
-
-    Args:
-        a: first int
-        b: second int
-    """
-    return a / b
+from AssistantFunctions import *
+from pymongo import MongoClient
 
 
 #########################################
@@ -54,17 +21,18 @@ class State(MessagesState):
 #########################################
 class LangGraphAssistant:
     def __init__(self, user_id):
-        load_dotenv()
         self.user_id = user_id
-        #self.mongodb_saver = MongoDBSaver.from_conn_string(os.getenv("MONGODB_URI"))
-        self.memory_saver = MemorySaver()
+        print(os.getenv("MONGODB_URI"))
+        self.mongodb_saver = MongoDBSaver(MongoClient(os.getenv("MONGODB_URI")))
+        #self.memory_saver = MemorySaver()
         self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
-        self.tools = [add, multiply, divide]
+        #self.python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
+        self.tools = [add, multiply, divide, web_search, python_repl]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read())
         self.thread_id = {"configurable": {"thread_id": self.user_id}}
         self.graph = self.build_graph()
-    
+
 
     def build_graph(self):
         # Graph
@@ -84,7 +52,8 @@ class LangGraphAssistant:
         )
         builder.add_edge("tools", "assistant")
         
-        graph = builder.compile(checkpointer=self.memory_saver)
+        graph = builder.compile(checkpointer=self.mongodb_saver)
+        #graph = builder.compile(checkpointer=self.memory_saver)
 
         return graph
 
@@ -96,7 +65,7 @@ class LangGraphAssistant:
     def stream_answer(self, question):
         input_message = HumanMessage(content=question)
 
-        return self.graph.astream_events({"messages": [input_message]}, self.thread_id, version="v2")
+        return self.graph.stream({"messages": [input_message]}, self.thread_id, stream_mode="messages")
 
 
     def get_answer(self, question):
