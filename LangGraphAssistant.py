@@ -7,6 +7,7 @@ from langchain_core.runnables import RunnableConfig
 import os
 from AssistantFunctions import *
 from pymongo import MongoClient
+from datetime import datetime
 
 
 #########################################
@@ -22,14 +23,13 @@ class State(MessagesState):
 class LangGraphAssistant:
     def __init__(self, user_id):
         self.user_id = user_id
-        print(os.getenv("MONGODB_URI"))
         self.mongodb_saver = MongoDBSaver(MongoClient(os.getenv("MONGODB_URI")))
         #self.memory_saver = MemorySaver()
         self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
         #self.python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
         self.tools = [add, multiply, divide, web_search, python_repl]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
-        self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read())
+        self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read() + f" Today is {datetime.now().strftime('%Y-%m-%d')}, in case you need the date to complete your tasks.")
         self.thread_id = {"configurable": {"thread_id": self.user_id}}
         self.graph = self.build_graph()
 

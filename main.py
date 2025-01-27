@@ -17,16 +17,17 @@ st.set_page_config(
 
 def stream_response(stream):
     for token in stream:
-        yield token[0].content
+        if isinstance(token[0], AIMessage):
+            if len(token[0].content) > 0:
+                yield token[0].content
 
 
 if "assistant" not in st.session_state:
     load_dotenv()
     st.session_state.assistant = LangGraphAssistant("12345")
 
-print(st.session_state.assistant.get_agent_state())
 if "messages" in st.session_state.assistant.get_agent_state().values:
-    print(st.session_state.assistant.get_agent_state())
+    #print(st.session_state.assistant.get_agent_state())
     for message in st.session_state.assistant.get_agent_state().values['messages']:
         if isinstance(message, HumanMessage):
             with st.chat_message("user"):
