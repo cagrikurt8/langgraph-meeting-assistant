@@ -1,5 +1,6 @@
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from langchain_openai import AzureChatOpenAI
+from langchain_openai.chat_models.base import BaseChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import START, END, MessagesState, StateGraph
 from langgraph.prebuilt import tools_condition, ToolNode
@@ -21,16 +22,18 @@ class State(MessagesState):
 # Assistant Class #
 #########################################
 class LangGraphAssistant:
-    def __init__(self, user_id):
+    def __init__(self, thread_id, user_id):
+        self.thread_id = thread_id
         self.user_id = user_id
         self.mongodb_saver = MongoDBSaver(MongoClient(os.getenv("MONGODB_URI")))
         #self.memory_saver = MemorySaver()
         self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
+        #self.llm = BaseChatOpenAI(model='deepseek-chat', openai_api_key=os.getenv("DEEPSEEK_API_KEY"), openai_api_base='https://api.deepseek.com', max_tokens=1024, temperature=0)
         #self.python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
-        self.tools = [add, multiply, divide, web_search, python_repl]
+        self.tools = [add, multiply, divide, web_search, python_repl, get_all_meetings]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
-        self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read() + f" Today is {datetime.now().strftime('%Y-%m-%d')}, in case you need the date to complete your tasks.")
-        self.thread_id = {"configurable": {"thread_id": self.user_id}}
+        self.sys_msg = SystemMessage(content=open("system_message.txt", "r").read() + f" Today is {datetime.now().strftime('%Y-%m-%d')}, in case you need the date to complete your tasks. The user ID of the user is {user_id}, you can use it in your tools.")
+        self.thread_id = {"configurable": {"thread_id": self.thread_id, "user_id": self.user_id}}
         self.graph = self.build_graph()
 
 

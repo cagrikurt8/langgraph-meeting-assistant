@@ -6,6 +6,7 @@ from PIL import Image
 import base64
 from io import BytesIO
 from dotenv import load_dotenv
+import os
 
 
 st.set_page_config(
@@ -24,7 +25,7 @@ def stream_response(stream):
 
 if "assistant" not in st.session_state:
     load_dotenv()
-    st.session_state.assistant = LangGraphAssistant("12345")
+    st.session_state.assistant = LangGraphAssistant("12345", os.getenv("USER_ID"))
 
 if "messages" in st.session_state.assistant.get_agent_state().values:
     #print(st.session_state.assistant.get_agent_state())
