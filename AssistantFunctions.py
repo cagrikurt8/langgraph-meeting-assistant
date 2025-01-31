@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from msal import ConfidentialClientApplication
 import os
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from azure.keyvault.secrets import SecretClient
 
 
@@ -25,6 +25,7 @@ def multiply(a: int, b: int) -> int:
     Args:
         a: first int
         b: second int
+    return: a * b
     """
     return a * b
 
@@ -35,6 +36,7 @@ def add(a: int, b: int) -> int:
     Args:
         a: first int
         b: second int
+    return: a + b
     """
     return a + b
 
@@ -45,6 +47,7 @@ def divide(a: int, b: int) -> float:
     Args:
         a: first int
         b: second int
+    return: a / b
     """
     return a / b
 
@@ -54,6 +57,7 @@ def web_search(question: str) -> str:
 
     Args:
         question: question to search for
+    return: search results
     """
     search = DuckDuckGoSearchResults(output_format="list")
     return search.invoke(question)
@@ -61,13 +65,18 @@ def web_search(question: str) -> str:
 
 def python_repl(code: str) -> str:
     """Executes the code in a python repl.
+    Note: If the result contains base64 encoded data, do not try to add it to your answer. It is shown on the UI, you should not add the base64 data to the answer. Just reply with 'Here is the image', 'Here is the file', etc.
 
     Args:
         code: code to execute
+    return: the result of the code execution
     """
-    python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
+    python_repl = SessionsPythonREPLTool(
+        pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"),
+        #access_token_provider=get_bearer_token_provider(DefaultAzureCredential(), "https://management.azure.com/.default")
+    )
     result = python_repl.execute(code)
-    print(result)
+    
     if isinstance(result, dict) and "result" in result and result['result']['type'] == 'image':
         return result
     
@@ -136,6 +145,7 @@ def get_all_meetings(user_id: str, date=None):
     """
     Get all meetings for a user from Microsoft Graph APIs.
     :param user_id: The user ID.
+    :param date: The date to filter the meetings.
     :return: The meetings if successful, otherwise an error message.
     """
     access_token = get_access_token()
@@ -225,6 +235,8 @@ def get_meeting_transcript_contents(user_id: str, subject: str, date=None):
     """
     Get all meeting transcript contents for a user from Microsoft Graph APIs.
     :param user_id: The user ID.
+    :param subject: The subject of the meeting.
+    :param date: The date to filter the meetings.
     :return: The meeting transcript contents if successful, otherwise an error message.
     """
 

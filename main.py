@@ -18,17 +18,29 @@ st.set_page_config(
 
 def stream_response(stream):
     for token in stream:
-        if isinstance(token[0], AIMessage):
-            if len(token[0].content) > 0:
-                yield token[0].content
+        if isinstance(token[0], AIMessage) and len(token[0].content) > 0 and token[1]["langgraph_node"] == "assistant":
+            yield token[0].content
+        elif isinstance(token[0], ToolMessage) and token[0].name == "python_repl":
+            try:
+                result_dict = json.loads(token[0].content)
+                if result_dict['result']['type'] == 'image':
+                    image_data = base64.b64decode(result_dict['result']['base64_data'])
+                    image = Image.open(BytesIO(image_data))
+                    yield image
+            except:
+                continue
 
 
 if "assistant" not in st.session_state:
     load_dotenv()
-    st.session_state.assistant = LangGraphAssistant("12345", os.getenv("USER_ID"))
+    st.session_state.assistant = LangGraphAssistant("1234", os.getenv("USER_ID"))
+
 
 if "messages" in st.session_state.assistant.get_agent_state().values:
-    #print(st.session_state.assistant.get_agent_state())
+    print("Summary:")
+    print(st.session_state.assistant.get_agent_state().values["summary"])
+    print()
+    print()
     for message in st.session_state.assistant.get_agent_state().values['messages']:
         if isinstance(message, HumanMessage):
             with st.chat_message("user"):
@@ -38,12 +50,15 @@ if "messages" in st.session_state.assistant.get_agent_state().values:
                 with st.chat_message("assistant"):
                     st.markdown(message.content)
         elif isinstance(message, ToolMessage) and message.name == "python_repl":
-            result_dict = json.loads(message.content)
-            if result_dict['result']['type'] == 'image':
-                with st.chat_message("assistant"):
-                    image_data = base64.b64decode(result_dict['result']['base64_data'])
-                    image = Image.open(BytesIO(image_data))
-                    st.write(image)
+            try:
+                result_dict = json.loads(message.content)
+                if result_dict['result']['type'] == 'image':
+                    with st.chat_message("assistant"):
+                        image_data = base64.b64decode(result_dict['result']['base64_data'])
+                        image = Image.open(BytesIO(image_data))
+                        st.write(image)
+            except:
+                continue
 
 
 if prompt := st.chat_input("Text your messages"):
