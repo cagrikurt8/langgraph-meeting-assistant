@@ -119,23 +119,23 @@ class LangGraphAssistant:
         result = []
         for tool_call in state["messages"][-1].tool_calls:
             tool = self.tools_by_name[tool_call["name"]]
-            #try:
-            if tool_call["name"] == "Python_REPL":
-                observation = json.loads(tool.invoke(tool_call["args"]))
-                if isinstance(observation['result'], dict) and observation["result"]["type"]== 'image':
-                    result.append(ToolMessage(content="Code execution is successfull.", name=tool_call["name"], artifact=observation, tool_call_id=tool_call["id"]))
+            try:
+                if tool_call["name"] == "Python_REPL":
+                    observation = json.loads(tool.invoke(tool_call["args"]))
+                    if isinstance(observation['result'], dict) and observation["result"]["type"]== 'image':
+                        result.append(ToolMessage(content="Code execution is successfull.", name=tool_call["name"], artifact=observation, tool_call_id=tool_call["id"]))
+                    else:
+                        result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
+                elif tool_call["name"] == "get_all_meetings":
+                    observation = tool.invoke(tool_call["args"])
+                    result.append(ToolMessage(content=str(observation[0]), name=tool_call["name"], tool_call_id=tool_call["id"]))
                 else:
+                    observation = tool.invoke(tool_call["args"])
                     result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
-            elif tool_call["name"] == "get_all_meetings":
-                observation = tool.invoke(tool_call["args"])
-                result.append(ToolMessage(content=str(observation[0]), name=tool_call["name"], tool_call_id=tool_call["id"]))
-            else:
-                observation = tool.invoke(tool_call["args"])
-                result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
-            
-            #except Exception as e:
-            #    print(f"Error: {e}")
-            #    result.append(ToolMessage(content=f"Error: {e}", name=tool_call["name"], tool_call_id=tool_call["id"]))
+                
+            except Exception as e:
+                print(f"Error: {e}")
+                result.append(ToolMessage(content=f"Error: {e}", name=tool_call["name"], tool_call_id=tool_call["id"]))
         
         return {"messages": result}
 
