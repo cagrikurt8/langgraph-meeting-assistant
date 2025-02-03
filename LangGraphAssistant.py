@@ -8,9 +8,9 @@ from langchain_core.runnables import RunnableConfig
 import os
 from AssistantFunctions import *
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
-
+import base64
 
 #########################################
 # State Class #
@@ -25,15 +25,18 @@ class State(MessagesState):
 # Assistant Class #
 #########################################
 class LangGraphAssistant:
-    def __init__(self, thread_id, user_id):
+    def __init__(self, thread_id, user_id, python_repl):
         self.thread_id = thread_id
         self.user_id = user_id
+        self.file = None
+        self.python_repl = python_repl
         self.mongodb_saver = MongoDBSaver(MongoClient(os.getenv("MONGODB_URI")))
         #self.memory_saver = MemorySaver()
         self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
         #self.llm = BaseChatOpenAI(model='deepseek-chat', openai_api_key=os.getenv("DEEPSEEK_API_KEY"), openai_api_base='https://api.deepseek.com', max_tokens=1024, temperature=0)
         #self.python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
-        self.tools = [add, multiply, divide, web_search, python_repl, get_all_meetings, get_meeting_transcript_contents]
+        self.tools_by_name = {"add": add, "multiply": multiply, "divide": divide, "web_search": web_search, "Python_REPL": self.python_repl, "get_all_meetings": get_all_meetings, "get_meeting_transcript_contents": get_meeting_transcript_contents}
+        self.tools = [add, multiply, divide, web_search, self.python_repl, get_all_meetings, get_meeting_transcript_contents]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.sys_msg = open("system_message.txt", "r").read() + f" Today is {datetime.now().strftime('%Y-%m-%d')}, in case you need the date to complete your tasks. The user ID of the user is {user_id}, you can use it in your tools."
         self.thread_id = {"configurable": {"thread_id": self.thread_id, "user_id": self.user_id}}
@@ -46,7 +49,8 @@ class LangGraphAssistant:
         
         # Define nodes: these do the work
         builder.add_node("assistant", self.call_model)
-        builder.add_node("tools", ToolNode(self.tools))
+        #builder.add_node("tools", ToolNode(self.tools))
+        builder.add_node("tools", self.tool_node)
         builder.add_node("summarize_conversation", self.summarize_conversation)
 
         # Define edges: these determine the control flow
@@ -97,11 +101,7 @@ class LangGraphAssistant:
                             )
         if isinstance(trimmed_messages[0], ToolMessage):
              trimmed_messages = trimmed_messages[1:]
-        print("Summarize Trimmed Messages:")
-        for m in trimmed_messages:
-             m.pretty_print()
-        print()
-        print()
+    
         if summary:
             summary_message = f"This is summary of the conversation to date: {summary}\n\n" \
                                "Extend the summary by taking into account the new messages above:"
@@ -113,6 +113,31 @@ class LangGraphAssistant:
         response = self.llm_with_tools.invoke(messages, config)
         
         return {"summary": response.content}
+
+
+    def tool_node(self, state: State, config: RunnableConfig):
+        result = []
+        for tool_call in state["messages"][-1].tool_calls:
+            tool = self.tools_by_name[tool_call["name"]]
+            #try:
+            if tool_call["name"] == "Python_REPL":
+                observation = json.loads(tool.invoke(tool_call["args"]))
+                if isinstance(observation['result'], dict) and observation["result"]["type"]== 'image':
+                    result.append(ToolMessage(content="Code execution is successfull.", name=tool_call["name"], artifact=observation, tool_call_id=tool_call["id"]))
+                else:
+                    result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
+            elif tool_call["name"] == "get_all_meetings":
+                observation = tool.invoke(tool_call["args"])
+                result.append(ToolMessage(content=str(observation[0]), name=tool_call["name"], tool_call_id=tool_call["id"]))
+            else:
+                observation = tool.invoke(tool_call["args"])
+                result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
+            
+            #except Exception as e:
+            #    print(f"Error: {e}")
+            #    result.append(ToolMessage(content=f"Error: {e}", name=tool_call["name"], tool_call_id=tool_call["id"]))
+        
+        return {"messages": result}
 
 
     def call_model(self, state: State, config: RunnableConfig):
@@ -129,8 +154,29 @@ class LangGraphAssistant:
                                 start_on="human",
                                 end_on=("human", "tool")
                             )
+            
+            for idx, m in enumerate(trimmed_messages):
+                if isinstance(m, ToolMessage) and m.name == "python_repl":
+                    try:
+                        result_dict = json.loads(m.content)
+                        if result_dict['result']['type'] == 'image':
+                            trimmed_messages[idx].content = "Image generation is successfull."
+                            trimmed_messages[idx].artifact = json.dumps(result_dict)
+                    except:
+                        continue
+
             messages = [SystemMessage(content=f"{self.sys_msg} {summary_msg}")] + trimmed_messages
         else:
+            for idx, m in enumerate(state["messages"]):
+                if isinstance(m, ToolMessage) and m.name == "python_repl":
+                    try:
+                        result_dict = json.loads(m.content)
+                        if result_dict['result']['type'] == 'image':
+                            state["messages"][idx].content = "Image generation is successfull."
+                            state["messages"][idx].artifact = json.dumps(result_dict)
+                    except:
+                        continue
+
             messages = [SystemMessage(content=self.sys_msg)] + state["messages"]
         print("Messages to be sent:")
         print(messages)
@@ -142,6 +188,12 @@ class LangGraphAssistant:
         input_message = HumanMessage(content=question)
 
         return self.graph.stream({"messages": [input_message]}, self.thread_id, stream_mode="messages")
+
+
+    def set_file(self, file):
+         self.file = file
+         self.python_repl.upload_file(data=BytesIO(self.file.read()), remote_file_path=self.file.name)
+         self.sys_msg += f" The file is set, you can use it in your tools. The file name is '/mnt/data/{file.name}'."
 
 
     def get_answer(self, question):

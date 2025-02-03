@@ -13,12 +13,13 @@ from msal import ConfidentialClientApplication
 import os
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from azure.keyvault.secrets import SecretClient
-
-
+from langchain_core.tools import tool
+import base64
 
 #########################################
 # TOOLS #
 #########################################
+@tool
 def multiply(a: int, b: int) -> int:
     """Multiply a and b.
 
@@ -30,6 +31,7 @@ def multiply(a: int, b: int) -> int:
     return a * b
 
 
+@tool
 def add(a: int, b: int) -> int:
     """Adds a and b.
 
@@ -41,6 +43,7 @@ def add(a: int, b: int) -> int:
     return a + b
 
 
+@tool
 def divide(a: int, b: int) -> float:
     """Adds a and b.
 
@@ -52,6 +55,7 @@ def divide(a: int, b: int) -> float:
     return a / b
 
 
+@tool
 def web_search(question: str) -> str:
     """Searches the web for the question.
 
@@ -61,26 +65,6 @@ def web_search(question: str) -> str:
     """
     search = DuckDuckGoSearchResults(output_format="list")
     return search.invoke(question)
-
-
-def python_repl(code: str) -> str:
-    """Executes the code in a python repl.
-    Note: If the result contains base64 encoded data, do not try to add it to your answer. It is shown on the UI, you should not add the base64 data to the answer. Just reply with 'Here is the image', 'Here is the file', etc.
-
-    Args:
-        code: code to execute
-    return: the result of the code execution
-    """
-    python_repl = SessionsPythonREPLTool(
-        pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"),
-        #access_token_provider=get_bearer_token_provider(DefaultAzureCredential(), "https://management.azure.com/.default")
-    )
-    result = python_repl.execute(code)
-    
-    if isinstance(result, dict) and "result" in result and result['result']['type'] == 'image':
-        return result
-    
-    return result
 
 
 def get_access_token():
@@ -141,6 +125,7 @@ def get_user_details(user_id: str):
     return response_body
 
 
+@tool
 def get_all_meetings(user_id: str, date=None):
     """
     Get all meetings for a user from Microsoft Graph APIs.
@@ -231,6 +216,7 @@ def get_meeting_transcript_urls(user_id: str, date=None):
     return transcript_content_url_list, access_token
 
 
+@tool
 def get_meeting_transcript_contents(user_id: str, subject: str, date=None):
     """
     Get all meeting transcript contents for a user from Microsoft Graph APIs.
