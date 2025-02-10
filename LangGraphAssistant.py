@@ -1,4 +1,6 @@
 from langgraph.checkpoint.mongodb import MongoDBSaver
+#from langgraph.checkpoint.postgres import PostgresSaver
+#from psycopg import Connection
 from langchain_openai import AzureChatOpenAI
 #from langchain_openai.chat_models.base import BaseChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage, RemoveMessage, BaseMessage, trim_messages
@@ -32,6 +34,13 @@ class LangGraphAssistant:
         self.python_repl = python_repl
         self.mongodb_saver = MongoDBSaver(MongoClient(os.getenv("MONGODB_URI")))
         #self.memory_saver = MemorySaver()
+        #connection_kwargs = {
+        #    "autocommit": True,
+        #    "prepare_threshold": 0,
+        #}
+        #conn = Connection.connect(os.getenv("POSTGRES_DB_URI"), **connection_kwargs)
+        #self.postgres_saver = PostgresSaver(conn)
+        #self.postgres_saver.setup()
         self.llm = AzureChatOpenAI(azure_deployment=os.getenv("MODEL_NAME"), api_version="2024-10-21", temperature=0)
         #self.llm = BaseChatOpenAI(model='deepseek-chat', openai_api_key=os.getenv("DEEPSEEK_API_KEY"), openai_api_base='https://api.deepseek.com', max_tokens=1024, temperature=0)
         #self.python_repl = SessionsPythonREPLTool(pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT"))
@@ -68,7 +77,8 @@ class LangGraphAssistant:
         
         graph = builder.compile(checkpointer=self.mongodb_saver)
         #graph = builder.compile(checkpointer=self.memory_saver)
-
+        #graph = builder.compile(checkpointer=self.postgres_saver)
+        
         return graph
 
 
