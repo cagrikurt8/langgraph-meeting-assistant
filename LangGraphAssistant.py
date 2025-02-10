@@ -135,7 +135,6 @@ class LangGraphAssistant:
                     observation = tool.invoke(tool_call["args"])
                     result.append(ToolMessage(content=str(observation[0]), name=tool_call["name"], tool_call_id=tool_call["id"]))
                 else:
-                    observation = tool.invoke(tool_call["args"])
                     result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
                 
             except Exception as e:

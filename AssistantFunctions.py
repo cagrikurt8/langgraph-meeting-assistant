@@ -170,9 +170,9 @@ def get_online_meeting_IDs(user_id: str, date=None):
     meeting_id_list = []
 
     if date is not None:
-        meeting_list, access_token = get_all_meetings(user_id, date)
+        meeting_list, access_token = get_all_meetings.invoke({"user_id": user_id, "date": date})
     else:
-        meeting_list, access_token = get_all_meetings(user_id)
+        meeting_list, access_token = get_all_meetings.invoke({"user_id": user_id})
     
     if type(meeting_list) == str:
         return meeting_list, access_token
@@ -234,6 +234,7 @@ def get_meeting_transcript_contents(user_id: str, subject: str, date=None):
     if type(transcript_content_url_list) == str:
         return transcript_content_url_list, access_token
     
+
     transcript_contents = []
 
     for transcript_content_url in transcript_content_url_list:
