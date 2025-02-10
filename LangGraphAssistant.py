@@ -99,8 +99,12 @@ class LangGraphAssistant:
                                 #start_on="human",
                                 end_on=("human", "tool")
                             )
-        if isinstance(trimmed_messages[0], ToolMessage):
-             trimmed_messages = trimmed_messages[1:]
+        idx = 0
+
+        while isinstance(trimmed_messages[idx], ToolMessage):
+            idx += 1
+
+        trimmed_messages = trimmed_messages[idx:]
     
         if summary:
             summary_message = f"This is summary of the conversation to date: {summary}\n\n" \
@@ -121,9 +125,10 @@ class LangGraphAssistant:
             tool = self.tools_by_name[tool_call["name"]]
             try:
                 if tool_call["name"] == "Python_REPL":
-                    observation = json.loads(tool.invoke(tool_call["args"]))
+                    observation = self.python_repl.execute(tool_call["args"]["python_code"])
+                 
                     if isinstance(observation['result'], dict) and observation["result"]["type"]== 'image':
-                        result.append(ToolMessage(content="Code execution is successfull.", name=tool_call["name"], artifact=observation, tool_call_id=tool_call["id"]))
+                        result.append(ToolMessage(content="Code execution is successfull and the image is already displayed on the UI. You can inform the user accordingly.", name=tool_call["name"], artifact=observation, tool_call_id=tool_call["id"]))
                     else:
                         result.append(ToolMessage(content=str(observation), name=tool_call["name"], tool_call_id=tool_call["id"]))
                 elif tool_call["name"] == "get_all_meetings":

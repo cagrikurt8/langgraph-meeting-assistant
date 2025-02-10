@@ -39,6 +39,7 @@ if "assistant" not in st.session_state:
     python_repl = SessionsPythonREPLTool(
         pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT")
     )
+    python_repl.execute("import matplotlib\nmatplotlib.set_loglevel('critical')")
     st.session_state.assistant = LangGraphAssistant(os.getenv("THREAD_ID"), os.getenv("USER_ID"), python_repl)
 
 
@@ -47,6 +48,7 @@ if "messages" in st.session_state.assistant.get_agent_state().values:
     #print(st.session_state.assistant.get_agent_state().values["summary"])
     #print()
     #print()
+
     for message in st.session_state.assistant.get_agent_state().values['messages']:
         message.pretty_print()
         if isinstance(message, HumanMessage):
@@ -56,7 +58,7 @@ if "messages" in st.session_state.assistant.get_agent_state().values:
             if len(message.content) > 0:
                 with st.chat_message("assistant"):
                     st.markdown(message.content)
-        elif isinstance(message, ToolMessage) and message.name == "python_repl":
+        elif isinstance(message, ToolMessage) and message.name == "Python_REPL":
             try:
                 result_dict = message.artifact
                 if result_dict['result']['type'] == 'image':
