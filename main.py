@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 import os
 from pymongo import MongoClient
 from langchain_azure_dynamic_sessions import SessionsPythonREPLTool
+import psycopg
+from psycopg import Error
 
 
 st.set_page_config(
@@ -16,6 +18,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+if "user_id" not in st.session_state or not st.session_state.user_id:
+    user_input = st.text_input("Enter your User ID", key="user_id_input")
+    if user_input:
+        st.session_state["user_id"] = user_input
+        st.rerun()
+    else:
+        st.warning("Please enter a User ID to continue")
+        st.stop()
 
 
 def stream_response(stream):
@@ -40,15 +52,10 @@ if "assistant" not in st.session_state:
         pool_management_endpoint=os.getenv("POOL_MANAGEMENT_ENDPOINT")
     )
     python_repl.execute("import matplotlib\nmatplotlib.set_loglevel('critical')")
-    st.session_state.assistant = LangGraphAssistant(os.getenv("THREAD_ID"), os.getenv("USER_ID"), python_repl)
+    st.session_state.assistant = LangGraphAssistant(st.session_state.user_id, st.session_state.user_id, python_repl)
 
 
 if "messages" in st.session_state.assistant.get_agent_state().values:
-    #print("Summary:")
-    #print(st.session_state.assistant.get_agent_state().values["summary"])
-    #print()
-    #print()
-
     for message in st.session_state.assistant.get_agent_state().values['messages']:
         message.pretty_print()
         if isinstance(message, HumanMessage):
@@ -77,13 +84,37 @@ with st.sidebar:
         st.session_state.assistant.set_file(file)
 
 
+    #if st.button("Clear Chat"):
+    #    with MongoClient(os.getenv("MONGODB_URI")) as mongo_client:
+    #        db = mongo_client["checkpointing_db"]
+    #        print(f"Chat record numbers: {db['checkpoints'].count_documents({'thread_id': os.getenv('THREAD_ID')})}")
+    #        db["checkpoints"].delete_many({"thread_id": os.getenv("THREAD_ID")})
+    #        print(f"Chat cleared. Record numbers: {db['checkpoints'].count_documents({'thread_id': os.getenv('THREAD_ID')})}")
+    #        st.rerun()
+
     if st.button("Clear Chat"):
-        with MongoClient(os.getenv("MONGODB_URI")) as mongo_client:
-            db = mongo_client["checkpointing_db"]
-            print(f"Chat record numbers: {db['checkpoints'].count_documents({'thread_id': os.getenv('THREAD_ID')})}")
-            db["checkpoints"].delete_many({"thread_id": os.getenv("THREAD_ID")})
-            print(f"Chat cleared. Record numbers: {db['checkpoints'].count_documents({'thread_id': os.getenv('THREAD_ID')})}")
-            st.rerun()
+        with psycopg.connect(os.getenv("POSTGRES_DB_URI")) as conn:
+            try:
+                cursor = conn.cursor()
+                # Get count before deletion
+                cursor.execute("SELECT COUNT(*) FROM checkpoints WHERE thread_id = %s", (st.session_state.user_id,))
+                count_before = cursor.fetchone()[0]
+                print(f"Chat record numbers: {count_before}")
+                
+                # Delete records
+                cursor.execute("DELETE FROM checkpoints WHERE thread_id = %s", (st.session_state.user_id,))
+                conn.commit()
+                
+                # Get count after deletion
+                cursor.execute("SELECT COUNT(*) FROM checkpoints WHERE thread_id = %s", (st.session_state.user_id,))
+                count_after = cursor.fetchone()[0]
+                print(f"Chat cleared. Record numbers: {count_after}")
+                
+                cursor.close()
+                conn.close()
+                st.rerun()
+            except Error as e:
+                print(f"Error: {e}")
 
 
 
