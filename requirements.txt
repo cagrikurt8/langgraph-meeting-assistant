@@ -14,3 +14,4 @@ msal==1.30.0
 azure-identity==1.17.1
 azure-keyvault-secrets==4.8.0
 streamlit==1.38.0
+psycopg_binary==3.2.4
