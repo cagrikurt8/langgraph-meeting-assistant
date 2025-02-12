@@ -170,6 +170,13 @@ class LangGraphAssistant:
                                 end_on=("human", "tool")
                             )
             
+            idx = 0
+
+            while isinstance(trimmed_messages[idx], ToolMessage):
+                idx += 1
+
+            trimmed_messages = trimmed_messages[idx:]
+            
             for idx, m in enumerate(trimmed_messages):
                 if isinstance(m, ToolMessage) and m.name == "python_repl":
                     try:
